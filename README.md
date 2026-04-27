@@ -1,376 +1,258 @@
-# Prescription AI Module
+# 💊 Prescription AI — Orizen Rx
 
-## 🚀 Overview
-
-This project implements a backend system where users upload a prescription image and receive exercise video recommendations. The system is designed with a focus on **performance, scalability, and resilience**.
+> An AI-powered prescription analyzer that reads prescription images, extracts medication names using **Google Gemini 2.5 Flash Vision**, and returns educational YouTube video links — with smart database caching for instant repeat results.
 
 ---
 
-## 🧠 How It Works — Step by Step (Pin to Pin)
+## 📌 Description
 
-### Step 1 — User Uploads Image
+**Prescription AI** is a Spring Boot backend system designed to help patients understand their prescriptions better.
 
-* User sends a prescription image via HTTP POST request:
+When a user uploads a prescription image:
+- **Google Gemini AI** reads the image and extracts the medication names
+- The system generates **YouTube educational video links** for each medication
+- Results are **cached in PostgreSQL** — so the same image never calls AI twice
 
-  ```
-  POST http://localhost:8080/api/upload
-  Content-Type: multipart/form-data
-  Key: file
-  ```
-
----
-
-### Step 2 — Controller Receives the Request
-
-**File:** `controller/PrescriptionController.java`
-
-```java
-@PostMapping("/upload")
-public ResponseEntity<String> uploadPrescription(
-        @RequestParam("file") MultipartFile file) {
-
-    if (file.isEmpty()) {
-        return ResponseEntity.badRequest().body("No file uploaded");
-    }
-
-    String result = service.processFile(file);
-
-    if (result.equals("Image unclear. Please retake.")) {
-        return ResponseEntity.badRequest().body(result);
-    }
-
-    return ResponseEntity.ok(result);
-}
-```
-
-* Checks if file is empty → returns `400 Bad Request` immediately
-* Passes file to `PrescriptionService.processFile()`
-* If service returns the error message → returns `400`
-* Otherwise returns `200 OK` with the video URL
+This solves a real-world problem: patients often receive prescriptions they don't understand. This system bridges that gap by giving them easy-to-access educational resources about their medications.
 
 ---
 
-### Step 3 — Service Gets the Filename
+## ✨ Features
 
-**File:** `service/PrescriptionService.java`
-
-```java
-String fileName = file.getOriginalFilename();
-```
-
-* Reads the original name of the uploaded file (e.g. `prescription.jpg`)
-* This filename is used as the **cache key** to check the database
-
----
-
-### Step 4 — Database Checked First (DB-First Logic)
-
-```java
-Optional<Prescription> existing = repo.findByFileName(fileName);
-
-if (existing.isPresent()) {
-    return "From DB: " + existing.get().getVideos();
-}
-```
-
-* Calls `PrescriptionRepository.findByFileName(fileName)`
-* Runs SQL: `SELECT * FROM prescription WHERE file_name = ?`
-* **If found (cache HIT)** → returns saved video URL immediately — no AI call
-* **If not found (cache MISS)** → continues to Step 5
-
----
-
-### Step 5 — AI Processing (Simulated)
-
-```java
-if (fileName != null && fileName.contains("error")) {
-    throw new RuntimeException("AI failed to process image");
-}
-
-String extractedText = "knee pain detected";
-String videos = "https://youtube.com/knee-exercise";
-```
-
-* If filename contains the word `error` → simulates AI failure → goes to catch block
-* Otherwise → mock AI returns: `"knee pain detected"` and a video URL
-* In production this would call a real AI Vision API
-
----
-
-### Step 6 — Result Saved to Database
-
-```java
-Prescription p = new Prescription();
-p.setFileName(fileName);
-p.setExtractedText(extractedText);
-p.setVideos(videos);
-
-repo.save(p);
-```
-
-* Creates a new `Prescription` entity with the filename, extracted text, and video URL
-* Saves it to the `prescription` table in PostgreSQL
-* Next time the same filename is uploaded → **Step 4 returns it instantly from DB**
-
----
-
-### Step 7 — Response Returned to User
-
-```java
-return "New Processed: " + videos;
-```
-
-* Returns plain text response with the video URL
-
----
-
-### Step 8 — Error Handling (Graceful Fallback)
-
-```java
-} catch (Exception e) {
-    return "Image unclear. Please retake.";
-}
-```
-
-* Any exception caught here — AI failure, file read error, DB error
-* Returns a friendly message instead of crashing with a 500 error
-* Controller maps this to a `400 Bad Request` response
-
----
-
-## 📁 Code File Structure — Every File Explained
-
-```
-prescription-ai/
-│
-├── src/main/java/prescription_ai/
-│   │
-│   ├── PrescriptionAiApplication.java
-│   │     Entry point. Starts the Spring Boot server on port 8080.
-│   │
-│   ├── controller/
-│   │   ├── PrescriptionController.java
-│   │   │     Receives POST /api/upload request.
-│   │   │     Validates file. Calls service. Returns response.
-│   │   │
-│   │   └── TestController.java
-│   │         Simple test endpoint to verify server is running.
-│   │
-│   ├── service/
-│   │   └── PrescriptionService.java
-│   │         MAIN LOGIC FILE.
-│   │         1. Gets filename from uploaded file
-│   │         2. Checks DB — if found, returns cached video URL
-│   │         3. If not found — runs mock AI logic
-│   │         4. Saves result to DB
-│   │         5. Returns video URL
-│   │         6. On any error — returns friendly message
-│   │
-│   ├── entity/
-│   │   └── Prescription.java
-│   │         JPA entity — maps to the `prescription` table in PostgreSQL.
-│   │         Fields: id, fileName, extractedText, videos
-│   │
-│   └── repository/
-│       └── PrescriptionRepository.java
-│             Spring Data JPA interface.
-│             Key method: findByFileName(String fileName)
-│             → runs: SELECT * FROM prescription WHERE file_name = ?
-│
-├── src/test/java/prescription_ai/
-│   └── PrescriptionAiApplicationTests.java
-│         Basic Spring Boot context load test.
-│
-├── src/main/resources/
-│   └── application.properties
-│         Server port, database URL, username, password, JPA settings.
-│
-├── pom.xml
-│     Project dependencies: Spring Web, Spring Data JPA, PostgreSQL driver.
-│
-└── README.md
-      This file.
-```
-
----
-
-## 🗄️ Database — Pin to Pin
-
-### Table: `prescription`
-
-Auto-created by Spring Boot JPA (`ddl-auto=update`) on startup.
-
-```sql
-CREATE TABLE prescription (
-    id            BIGSERIAL PRIMARY KEY,
-    file_name     VARCHAR(255),
-    extracted_text VARCHAR(5000),
-    videos        VARCHAR(5000)
-);
-```
-
-### Column Details
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | BIGSERIAL | Auto-increment primary key |
-| `file_name` | VARCHAR(255) | Filename used as cache key (e.g. `prescription.jpg`) |
-| `extracted_text` | VARCHAR(5000) | What the AI detected from the image |
-| `videos` | VARCHAR(5000) | Video URL returned to the user |
-
-### Useful Queries
-
-```sql
--- Connect to DB
-psql -U your_username -d prescription_db
-
--- See all saved records
-SELECT * FROM prescription;
-
--- See specific columns
-SELECT id, file_name, videos FROM prescription;
-
--- Search by filename
-SELECT * FROM prescription WHERE file_name = 'prescription.jpg';
-
--- Check how many records are cached
-SELECT COUNT(*) FROM prescription;
-
--- Delete one record
-DELETE FROM prescription WHERE id = 1;
-
--- Clear all cached records
-TRUNCATE TABLE prescription RESTART IDENTITY;
-
--- Exit
-\q
-```
+- 📷 **Upload Prescription Image** — Supports JPG, PNG, WEBP up to 10MB
+- 🤖 **Real AI Analysis** — Google Gemini 2.5 Flash Vision reads and extracts medication names
+- 🎬 **YouTube Video Recommendations** — One educational video link per detected medication
+- ⚡ **Smart Caching** — SHA-256 content hash checked against PostgreSQL before any AI call
+- 🔁 **Instant Repeat Results** — Same image returns in ~1ms from cache (vs ~5–8s AI call)
+- 🛡️ **Graceful Error Handling** — User-friendly messages, never raw 500 errors
+- 🌐 **REST API** — Clean JSON responses with proper HTTP status codes
+- 💻 **Built-in Frontend** — Beautiful dark-mode web UI served at `localhost:8080`
 
 ---
 
 ## 🛠 Tech Stack
 
-* Backend: Spring Boot 4.0 (Java 17)
-* Database: PostgreSQL
-* API Client: WebClient (Reactive)
-* Language: Java
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Spring Boot 4.0 |
+| **Language** | Java 17 |
+| **AI Vision** | Google Gemini 2.5 Flash |
+| **Database** | PostgreSQL 16 |
+| **ORM** | Spring Data JPA + Hibernate |
+| **JSON Parsing** | Jackson Databind |
+| **HTTP Client** | Java `java.net.http.HttpClient` |
+| **Build Tool** | Maven |
+| **Frontend** | HTML + CSS + JavaScript |
 
 ---
 
-## ⚡ Key Features
-
-### ✅ 1. Database-First Logic
-
-* Filename used as cache key
-* PostgreSQL checked before any AI processing
-* Prevents unnecessary API calls — improves performance and reduces cost
-
-### ✅ 2. Resilient Error Handling
-
-* All exceptions caught in one `catch` block
-* Returns user-friendly message instead of crashing:
-
-  > "Image unclear. Please retake."
-
-* Controller maps error message to `400 Bad Request` — never returns raw 500
-
-### ✅ 3. WebClient Integration
-
-* Non-blocking API communication
-* Better suited for high-concurrency systems
-* Preferred over RestTemplate
-
-### ✅ 4. Secure API Key Management
-
-* API key stored in `application.properties` via environment variable
-* Avoids hardcoding sensitive data in source code
-
----
-
-## 🧪 API Endpoint
-
-### Upload Prescription
+## 📁 Folder Structure
 
 ```
-POST /api/upload
-Content-Type: multipart/form-data
-
-Key:   file
-Value: image file
+prescription-ai/
+│
+├── src/main/java/prescription_ai/
+│   ├── PrescriptionAiApplication.java    ← App entry point
+│   ├── controller/
+│   │   └── PrescriptionController.java  ← Handles HTTP requests
+│   ├── service/
+│   │   └── PrescriptionService.java     ← Core business logic
+│   ├── entity/
+│   │   └── Prescription.java            ← Database table model
+│   ├── repository/
+│   │   └── PrescriptionRepository.java  ← Database queries
+│   └── dto/
+│       └── PrescriptionResponse.java    ← JSON response format
+│
+├── src/main/resources/
+│   ├── application.properties           ← App configuration
+│   └── static/
+│       └── index.html                   ← Frontend UI
+│
+├── pom.xml                              ← Maven dependencies
+└── README.md
 ```
 
 ---
 
-## 📌 Sample Responses
+## ⚙️ Installation
 
-### First Upload (new file — processed)
+### Prerequisites
 
-```
-New Processed: https://youtube.com/knee-exercise
-```
+Make sure you have the following installed:
+- ✅ Java 17
+- ✅ Maven
+- ✅ PostgreSQL
 
-### Second Upload (same filename — from DB cache)
+---
 
-```
-From DB: https://youtube.com/knee-exercise
-```
+### Step 1 — Clone the Repository
 
-### Error Case (filename contains "error" or any failure)
-
-```
-Image unclear. Please retake.
+```bash
+git clone https://github.com/your-username/prescription-ai.git
+cd prescription-ai
 ```
 
 ---
 
-## ▶️ How to Run
+### Step 2 — Create the Database
 
-1. Start PostgreSQL and create database:
+```bash
+createdb -U your_username prescription_db
+```
 
-   ```sql
-   CREATE DATABASE prescription_db;
-   ```
-
-2. Update `application.properties`:
-
-   ```properties
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   ```
-
-3. Run Spring Boot application:
-
-   ```bash
-   mvn spring-boot:run
-   ```
-
-4. Test with curl:
-
-   ```bash
-   # Upload a real image
-   curl -X POST http://localhost:8080/api/upload \
-     -F "file=@prescription.jpg"
-
-   # Test error case
-   curl -X POST http://localhost:8080/api/upload \
-     -F "file=@error_image.jpg"
-
-   # Test empty file
-   curl -X POST http://localhost:8080/api/upload \
-     -F "file=@/dev/null;filename=empty.jpg"
-   ```
+Or using psql:
+```sql
+CREATE DATABASE prescription_db;
+```
 
 ---
 
-## 💡 Design Decisions
+### Step 3 — Configure the App
 
-* Used DB caching to optimize external API usage
-* Used filename as cache key — simple and effective for prototype
-* Implemented graceful fallback for AI failures
-* Used WebClient for scalability and modern reactive design
+Open `src/main/resources/application.properties` and set:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/prescription_db
+spring.datasource.username=your_postgres_username
+spring.datasource.password=your_postgres_password
+
+gemini.api.key=YOUR_GEMINI_API_KEY
+```
+
+> 🔑 Get a **free Gemini API key** at: https://aistudio.google.com/app/apikey
 
 ---
 
-## 🔚 Conclusion
+### Step 4 — Run the App
 
-This system demonstrates how to build a scalable backend service with proper architecture, error handling, and performance optimization — suitable for real-world medical applications.
+```bash
+./mvnw spring-boot:run
+```
+
+You should see:
+```
+Started PrescriptionAiApplication in 2.3 seconds
+Tomcat started on port 8080
+```
+
+---
+
+## 🚀 Usage
+
+### Option 1 — Use the Web UI
+
+Open your browser and go to:
+```
+http://localhost:8080
+```
+
+1. Click **"Choose Image"** and select a prescription photo
+2. Click **"Analyze Prescription"**
+3. Wait ~5–8 seconds for Gemini AI to read the image
+4. See the detected medications and YouTube video links
+
+---
+
+### Option 2 — Use the API Directly
+
+**Upload a prescription image:**
+```bash
+curl -X POST http://localhost:8080/api/v1/prescription/upload \
+  -F "file=@prescription.jpg"
+```
+
+**Check server health:**
+```bash
+curl http://localhost:8080/api/v1/prescription/health
+```
+
+---
+
+### API Response
+
+**Success (first upload — AI analyzed):**
+```json
+{
+  "success": true,
+  "cached": false,
+  "message": "Analyzed by Gemini AI",
+  "medications": ["Paracetamol", "Amoxicillin", "Omeprazole"],
+  "videos": [
+    "https://www.youtube.com/results?search_query=Paracetamol+medication+uses+side+effects+guide",
+    "https://www.youtube.com/results?search_query=Amoxicillin+medication+uses+side+effects+guide",
+    "https://www.youtube.com/results?search_query=Omeprazole+medication+uses+side+effects+guide"
+  ]
+}
+```
+
+**Success (same image again — from cache):**
+```json
+{
+  "success": true,
+  "cached": true,
+  "message": "Served from cache",
+  "medications": ["Paracetamol", "Amoxicillin", "Omeprazole"],
+  "videos": [ "..." ]
+}
+```
+
+**Error (unclear image):**
+```json
+{
+  "success": false,
+  "message": "Image unclear. Please retake.",
+  "medications": [],
+  "videos": []
+}
+```
+
+---
+
+## 🗄️ Database
+
+The `prescription` table is **automatically created** when the app starts.
+
+```sql
+CREATE TABLE prescription (
+    id             BIGSERIAL PRIMARY KEY,
+    file_name      VARCHAR(255),   -- SHA-256 hash of the image (cache key)
+    extracted_text VARCHAR(5000),  -- detected medication names
+    videos         VARCHAR(5000)   -- YouTube video URLs
+);
+```
+
+**Check cached results:**
+```bash
+psql -U your_username -d prescription_db -c "SELECT id, extracted_text FROM prescription;"
+```
+
+**Clear the cache** (force re-analysis on next upload):
+```bash
+psql -U your_username -d prescription_db -c "TRUNCATE TABLE prescription RESTART IDENTITY;"
+```
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/prescription/health` | Server health check |
+| `POST` | `/api/v1/prescription/upload` | Analyze prescription image |
+| `GET` | `/` | Frontend web UI |
+
+---
+
+## 👤 Author
+
+**Shaik Chandbasha**
+- 🎓 Java Backend Developer
+- 💼 Built with Spring Boot, PostgreSQL & Google Gemini AI
+- 📧 [chandbasha434@gmail.com](mailto:chandbasha434@gmail.com)
+
+---
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
