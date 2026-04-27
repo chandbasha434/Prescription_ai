@@ -6,36 +6,37 @@ public class PrescriptionResponse {
 
     private boolean success;
     private boolean cached;
-    private String message;
+    private String  message;
+    private List<MedicationInfo> medications;
     private List<String> videos;
-    private List<String> medications;  // medication names detected by Gemini
 
-    // ── Success response ──────────────────────────────────────────
-    public static PrescriptionResponse ok(List<String> videos, List<String> medications, boolean cached) {
+    // ── Success ───────────────────────────────────────────────────
+    public static PrescriptionResponse ok(
+            List<MedicationInfo> medications, List<String> videos, boolean cached) {
         PrescriptionResponse r = new PrescriptionResponse();
         r.success     = true;
         r.cached      = cached;
-        r.videos      = videos;
         r.medications = medications;
+        r.videos      = videos;
         r.message     = cached ? "Served from cache" : "Analyzed by Gemini AI";
         return r;
     }
 
-    // ── Error response ────────────────────────────────────────────
+    // ── Error ─────────────────────────────────────────────────────
     public static PrescriptionResponse error(String message) {
         PrescriptionResponse r = new PrescriptionResponse();
         r.success     = false;
         r.cached      = false;
         r.message     = message;
-        r.videos      = List.of();
         r.medications = List.of();
+        r.videos      = List.of();
         return r;
     }
 
     // ── Getters ───────────────────────────────────────────────────
-    public boolean isSuccess()          { return success; }
-    public boolean isCached()           { return cached; }
-    public String getMessage()          { return message; }
-    public List<String> getVideos()     { return videos; }
-    public List<String> getMedications(){ return medications; }
+    public boolean isSuccess()                   { return success; }
+    public boolean isCached()                    { return cached; }
+    public String  getMessage()                  { return message; }
+    public List<MedicationInfo> getMedications() { return medications; }
+    public List<String> getVideos()              { return videos; }
 }

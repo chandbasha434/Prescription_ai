@@ -1,310 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="description" content="AI-powered prescription analyzer using Google Gemini Vision"/>
   <title>Orizen Rx — AI Prescription Analyzer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #0a0d14;
-      --surface:   #111827;
-      --card:      #1a2235;
-      --border:    #1f2d45;
-      --teal:      #14bdac;
-      --teal-dim:  #0d7377;
-      --blue:      #1e4d8c;
-      --blue-light:#2563eb;
-      --text:      #e2eaf8;
-      --muted:     #6b8aaa;
-      --gold:      #f0a500;
-      --error:     #f87171;
-      --success:   #34d399;
-      --glow:      rgba(20,189,172,0.15);
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#06040f;--glass:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.1);
+      --purple:#7c3aed;--cyan:#06b6d4;--emerald:#10b981;--pink:#ec4899;
+      --text:#f1f5f9;--muted:#94a3b8;--error:#f87171;--gold:#fbbf24;
     }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* ── Animated grid background ── */
-    body::before {
-      content:'';
-      position:fixed; inset:0; z-index:0;
-      background-image:
-        linear-gradient(rgba(20,189,172,.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(20,189,172,.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events:none;
-    }
-
-    .wrap { position:relative; z-index:1; max-width:780px; margin:0 auto; padding:40px 20px 80px; }
+    html{scroll-behavior:smooth}
+    body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+    #bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+    .wrap{position:relative;z-index:1;max-width:820px;margin:0 auto;padding:40px 20px 100px}
 
     /* ── Header ── */
-    .header { text-align:center; margin-bottom:48px; }
-    .badge {
-      display:inline-flex; align-items:center; gap:8px;
-      background: rgba(20,189,172,.1); border:1px solid rgba(20,189,172,.25);
-      color: var(--teal); font-size:12px; font-weight:600; letter-spacing:.08em;
-      padding:6px 14px; border-radius:20px; margin-bottom:20px;
-      text-transform:uppercase;
-    }
-    .badge::before { content:'●'; font-size:8px; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .header{text-align:center;margin-bottom:48px;padding-top:20px}
+    .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(124,58,237,.15);
+      border:1px solid rgba(124,58,237,.4);color:#a78bfa;font-size:12px;font-weight:600;
+      letter-spacing:.1em;padding:6px 16px;border-radius:30px;margin-bottom:24px;text-transform:uppercase}
+    .dot{width:8px;height:8px;border-radius:50%;background:#10b981;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{box-shadow:0 0 0 8px rgba(16,185,129,0)}}
+    h1{font-size:clamp(2.2rem,6vw,3.5rem);font-weight:900;line-height:1.1;margin-bottom:14px;
+      background:linear-gradient(135deg,#fff 0%,#a78bfa 40%,#06b6d4 80%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .subtitle{color:var(--muted);font-size:17px;font-weight:400;max-width:500px;margin:0 auto}
 
-    h1 {
-      font-size:clamp(2rem,5vw,3rem); font-weight:800;
-      background: linear-gradient(135deg, #e2eaf8 0%, var(--teal) 60%, var(--blue-light) 100%);
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-      line-height:1.15; margin-bottom:12px;
-    }
-    .subtitle { color:var(--muted); font-size:16px; font-weight:400; }
+    /* ── Glass card ── */
+    .glass{background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+      border:1px solid var(--border);border-radius:24px}
 
     /* ── Upload zone ── */
-    .upload-card {
-      background: var(--card); border:2px dashed var(--border);
-      border-radius:20px; padding:40px 32px; text-align:center;
-      transition: border-color .25s, background .25s, box-shadow .25s;
-      cursor:pointer; position:relative; overflow:hidden;
-    }
-    .upload-card.drag-over {
-      border-color: var(--teal); background: rgba(20,189,172,.06);
-      box-shadow: 0 0 40px var(--glow);
-    }
-    .upload-card.has-image { border-style:solid; border-color: var(--teal-dim); }
-
-    .upload-icon {
-      width:72px; height:72px; margin:0 auto 20px;
-      background: linear-gradient(135deg, var(--teal-dim), var(--blue));
-      border-radius:50%; display:flex; align-items:center; justify-content:center;
-      font-size:30px; box-shadow: 0 8px 32px rgba(20,189,172,.25);
-    }
-    .upload-title { font-size:18px; font-weight:600; margin-bottom:8px; }
-    .upload-sub   { color:var(--muted); font-size:14px; margin-bottom:24px; }
-
-    #fileInput { display:none; }
-
-    /* ── Preview ── */
-    #preview-wrap { display:none; margin-bottom:24px; }
-    #preview-wrap img {
-      max-width:100%; max-height:280px; border-radius:12px;
-      object-fit:contain; border:1px solid var(--border);
-      box-shadow: 0 8px 32px rgba(0,0,0,.4);
-    }
-    .preview-name {
-      margin-top:10px; font-size:13px; color:var(--muted);
-      display:flex; align-items:center; justify-content:center; gap:6px;
-    }
+    .upload-card{padding:44px 32px;text-align:center;cursor:pointer;transition:.3s;position:relative;overflow:hidden}
+    .upload-card::before{content:'';position:absolute;inset:0;border-radius:24px;padding:1px;
+      background:linear-gradient(135deg,rgba(124,58,237,.5),rgba(6,182,212,.5));
+      -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+      -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+    .upload-card.drag-over{background:rgba(124,58,237,.1);transform:scale(1.01)}
+    .upload-card.has-file{border-color:rgba(16,185,129,.4)}
+    .upload-icon-wrap{width:88px;height:88px;margin:0 auto 20px;border-radius:50%;
+      background:linear-gradient(135deg,#7c3aed,#06b6d4);display:flex;align-items:center;
+      justify-content:center;font-size:36px;box-shadow:0 0 40px rgba(124,58,237,.4);
+      animation:float 4s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+    .upload-title{font-size:20px;font-weight:700;margin-bottom:8px}
+    .upload-sub{color:var(--muted);font-size:14px;margin-bottom:28px}
+    #fileInput{display:none}
+    #preview-wrap{display:none;margin-bottom:20px}
+    #preview-img{max-width:100%;max-height:260px;border-radius:12px;object-fit:contain;
+      border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.5)}
+    .preview-name{margin-top:10px;font-size:13px;color:var(--muted);display:flex;
+      align-items:center;justify-content:center;gap:6px}
 
     /* ── Buttons ── */
-    .btn-row { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
-
-    .btn {
-      display:inline-flex; align-items:center; gap:8px;
-      padding:14px 28px; border-radius:12px; font-size:15px;
-      font-weight:600; font-family:inherit; border:none; cursor:pointer;
-      transition: transform .15s, box-shadow .15s, opacity .15s;
-      letter-spacing:.02em;
-    }
-    .btn:active { transform:scale(.97); }
-    .btn:disabled { opacity:.45; cursor:not-allowed; transform:none !important; }
-
-    .btn-pick {
-      background: var(--surface); color: var(--text);
-      border:1px solid var(--border);
-    }
-    .btn-pick:hover:not(:disabled) { border-color:var(--teal); box-shadow:0 0 20px var(--glow); }
-
-    .btn-analyze {
-      background: linear-gradient(135deg, var(--teal-dim), var(--teal));
-      color:#fff; box-shadow: 0 4px 20px rgba(20,189,172,.35);
-    }
-    .btn-analyze:hover:not(:disabled) { box-shadow:0 6px 28px rgba(20,189,172,.55); transform:translateY(-1px); }
-
-    .btn-clear {
-      background:transparent; color:var(--muted);
-      border:1px solid var(--border); font-size:14px; padding:10px 20px;
-    }
-    .btn-clear:hover:not(:disabled) { color:var(--error); border-color:var(--error); }
+    .btn-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:14px;
+      font-size:15px;font-weight:600;font-family:inherit;border:none;cursor:pointer;
+      transition:.2s;letter-spacing:.02em}
+    .btn:active{transform:scale(.97)}
+    .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+    .btn-pick{background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--border)}
+    .btn-pick:hover:not(:disabled){border-color:rgba(124,58,237,.5);background:rgba(124,58,237,.1)}
+    .btn-analyze{background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;
+      box-shadow:0 4px 24px rgba(124,58,237,.4)}
+    .btn-analyze:hover:not(:disabled){box-shadow:0 6px 36px rgba(124,58,237,.6);transform:translateY(-2px)}
+    .btn-clear{background:transparent;color:var(--muted);border:1px solid var(--border);font-size:14px;padding:12px 22px}
+    .btn-clear:hover:not(:disabled){color:var(--error);border-color:var(--error)}
+    #action-row{margin-top:20px;display:none}
 
     /* ── Loading ── */
-    #loading { display:none; margin:32px 0; text-align:center; }
-    .spinner-wrap { position:relative; width:60px; height:60px; margin:0 auto 16px; }
-    .ring {
-      position:absolute; inset:0; border-radius:50%; border:3px solid transparent;
-      animation: spin 1.2s linear infinite;
-    }
-    .ring-1 { border-top-color:var(--teal); }
-    .ring-2 { border-right-color:var(--blue-light); animation-delay:.4s; inset:6px; }
-    @keyframes spin { to { transform:rotate(360deg); } }
+    #loading{display:none;margin:36px 0;text-align:center}
+    .spinner{width:64px;height:64px;margin:0 auto 20px;position:relative}
+    .spinner::before,.spinner::after{content:'';position:absolute;border-radius:50%;border:3px solid transparent;animation:spin 1.4s linear infinite}
+    .spinner::before{inset:0;border-top-color:#7c3aed}
+    .spinner::after{inset:8px;border-right-color:#06b6d4;animation-delay:.4s}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading-text{font-size:16px;font-weight:600;color:#a78bfa;margin-bottom:6px}
+    .loading-step{font-size:13px;color:var(--muted);min-height:18px}
 
-    .loading-text { color:var(--teal); font-size:15px; font-weight:500; }
-    .loading-steps { margin-top:8px; font-size:13px; color:var(--muted); min-height:20px; }
+    /* ── Results ── */
+    #result{display:none;margin-top:32px}
 
-    /* ── Result card ── */
-    #result { display:none; margin-top:32px; }
+    /* Banner */
+    .result-banner{padding:20px 24px;border-radius:20px;margin-bottom:20px;
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+    .result-banner.success{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(6,182,212,.1));
+      border:1px solid rgba(16,185,129,.3)}
+    .result-banner.error{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25)}
+    .banner-left{display:flex;align-items:center;gap:12px}
+    .banner-icon{font-size:28px}
+    .banner-title{font-size:18px;font-weight:700}
+    .banner-sub{font-size:13px;color:var(--muted);margin-top:2px}
+    .cache-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,.12);
+      border:1px solid rgba(251,191,36,.3);color:var(--gold);font-size:12px;font-weight:600;
+      padding:6px 14px;border-radius:30px}
+    .ai-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(124,58,237,.15);
+      border:1px solid rgba(124,58,237,.4);color:#a78bfa;font-size:12px;font-weight:600;
+      padding:6px 14px;border-radius:30px}
 
-    .result-card {
-      background: var(--card); border:1px solid var(--border);
-      border-radius:20px; padding:32px; position:relative; overflow:hidden;
-    }
-    .result-card::before {
-      content:''; position:absolute; top:0; left:0; right:0; height:3px;
-      background: linear-gradient(90deg, var(--teal-dim), var(--teal), var(--blue-light));
-    }
-
-    .result-header {
-      display:flex; align-items:center; justify-content:space-between;
-      flex-wrap:wrap; gap:12px; margin-bottom:24px;
-    }
-    .result-title { font-size:18px; font-weight:700; }
-
-    .cache-badge {
-      display:inline-flex; align-items:center; gap:6px;
-      background: rgba(240,165,0,.12); border:1px solid rgba(240,165,0,.3);
-      color:var(--gold); font-size:12px; font-weight:600;
-      padding:5px 12px; border-radius:20px;
-    }
-    .ai-badge {
-      display:inline-flex; align-items:center; gap:6px;
-      background: rgba(20,189,172,.12); border:1px solid rgba(20,189,172,.3);
-      color:var(--teal); font-size:12px; font-weight:600;
-      padding:5px 12px; border-radius:20px;
-    }
-
-    /* Meds extracted */
-    .meds-section { margin-bottom:24px; }
-    .section-label {
-      font-size:11px; font-weight:600; color:var(--muted);
-      text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;
-    }
-    .meds-list { display:flex; flex-wrap:wrap; gap:8px; }
-    .med-chip {
-      background: rgba(37,99,235,.15); border:1px solid rgba(37,99,235,.3);
-      color:#93c5fd; font-size:13px; font-weight:500;
-      padding:6px 14px; border-radius:20px;
-    }
+    /* Medications */
+    .section-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.1em;margin-bottom:12px}
+    .meds-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
+    .med-chip{padding:12px 18px;border-radius:16px;
+      background:linear-gradient(135deg,rgba(124,58,237,.2),rgba(6,182,212,.15));
+      border:1px solid rgba(124,58,237,.35);transition:.2s;cursor:default}
+    .med-chip:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(124,58,237,.3)}
+    .med-chip-name{font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
+    .med-chip-use{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
 
     /* Videos */
-    .video-list { display:flex; flex-direction:column; gap:12px; }
-    .video-item {
-      background: var(--surface); border:1px solid var(--border);
-      border-radius:12px; padding:16px 20px;
-      display:flex; align-items:center; gap:14px;
-      transition: border-color .2s, transform .2s;
-    }
-    .video-item:hover { border-color:var(--teal); transform:translateX(4px); }
+    .videos-grid{display:grid;gap:12px}
+    .video-card{padding:18px 20px;border-radius:16px;display:flex;align-items:center;gap:16px;
+      background:rgba(255,255,255,.03);border:1px solid var(--border);
+      transition:.25s;text-decoration:none;color:inherit}
+    .video-card:hover{background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.4);
+      transform:translateX(6px);box-shadow:0 8px 32px rgba(124,58,237,.2)}
+    .video-num{min-width:40px;height:40px;border-radius:50%;
+      background:linear-gradient(135deg,#7c3aed,#06b6d4);display:flex;align-items:center;
+      justify-content:center;font-size:15px;font-weight:800;color:#fff;
+      box-shadow:0 4px 16px rgba(124,58,237,.4)}
+    .video-info{flex:1;min-width:0}
+    .video-med{font-size:15px;font-weight:700;margin-bottom:3px}
+    .video-link{font-size:12px;color:#06b6d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .video-play{font-size:22px;opacity:.7}
 
-    .video-num {
-      min-width:32px; height:32px; border-radius:50%;
-      background: linear-gradient(135deg, var(--teal-dim), var(--teal));
-      display:flex; align-items:center; justify-content:center;
-      font-size:13px; font-weight:700; color:#fff;
-    }
-    .video-info { flex:1; min-width:0; }
-    .video-title { font-size:14px; font-weight:600; margin-bottom:2px; }
-    .video-url {
-      font-size:12px; color:var(--teal); white-space:nowrap;
-      overflow:hidden; text-overflow:ellipsis;
-      text-decoration:none;
-    }
-    .video-url:hover { text-decoration:underline; }
-    .video-icon { font-size:20px; opacity:.6; }
+    /* Stats */
+    .stats-row{display:flex;gap:0;border-top:1px solid var(--border);margin-top:24px;
+      padding-top:20px;flex-wrap:wrap}
+    .stat{flex:1;min-width:80px;text-align:center;padding:0 12px}
+    .stat:not(:last-child){border-right:1px solid var(--border)}
+    .stat-val{font-size:22px;font-weight:800;
+      background:linear-gradient(135deg,#a78bfa,#06b6d4);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .stat-lbl{font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
 
-    /* Error card */
-    .error-card {
-      background: rgba(248,113,113,.08); border:1px solid rgba(248,113,113,.25);
-      border-radius:16px; padding:24px; display:flex; gap:16px; align-items:flex-start;
-    }
-    .error-icon { font-size:24px; }
-    .error-title { font-weight:600; color:var(--error); margin-bottom:4px; }
-    .error-msg   { font-size:14px; color:var(--muted); }
-
-    /* Stats bar */
-    .stats-bar {
-      display:flex; gap:24px; flex-wrap:wrap;
-      border-top:1px solid var(--border); margin-top:24px; padding-top:20px;
-    }
-    .stat { display:flex; flex-direction:column; gap:3px; }
-    .stat-val { font-size:20px; font-weight:700; color:var(--teal); }
-    .stat-lbl { font-size:12px; color:var(--muted); }
+    /* Nav */
+    .nav-bar{display:flex;justify-content:flex-end;margin-bottom:8px}
+    .nav-link{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:30px;
+      background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);
+      text-decoration:none;font-size:13px;font-weight:600;transition:.2s}
+    .nav-link:hover{color:var(--text);border-color:rgba(124,58,237,.4);background:rgba(124,58,237,.1)}
 
     /* Toast */
-    #toast {
-      position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(80px);
-      background:var(--card); border:1px solid var(--border);
-      color:var(--text); padding:12px 22px; border-radius:12px;
-      font-size:14px; font-weight:500; transition:transform .3s ease;
-      z-index:999; white-space:nowrap; box-shadow:0 8px 32px rgba(0,0,0,.4);
-    }
-    #toast.show { transform:translateX(-50%) translateY(0); }
+    #toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(80px);
+      background:rgba(15,10,30,.9);backdrop-filter:blur(16px);border:1px solid var(--border);
+      color:var(--text);padding:12px 24px;border-radius:30px;font-size:14px;font-weight:500;
+      transition:.3s;z-index:999;white-space:nowrap;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+    #toast.show{transform:translateX(-50%) translateY(0)}
 
     /* Responsive */
-    @media(max-width:520px) {
-      .btn-row { flex-direction:column; }
-      .btn { justify-content:center; }
-      .stats-bar { gap:16px; }
+    @media(max-width:600px){
+      .wrap{padding:24px 14px 80px}
+      .btn-row,.btn-row#action-row{flex-direction:column;align-items:stretch}
+      .btn{justify-content:center}
+      .stats-row{gap:12px}
+      .stat:not(:last-child){border-right:none;border-bottom:1px solid var(--border);padding-bottom:12px}
+      .upload-card{padding:28px 16px}
     }
   </style>
 </head>
 <body>
+
+<canvas id="bg"></canvas>
+
 <div class="wrap">
+
+  <!-- Nav -->
+  <div class="nav-bar">
+    <a class="nav-link" href="/history.html">📋 View History</a>
+  </div>
 
   <!-- Header -->
   <div class="header">
-    <div class="badge">🟢 Backend Connected · localhost:8080</div>
+    <div class="badge"><div class="dot"></div> Powered by Gemini 2.5 Flash</div>
     <h1>💊 Orizen Rx<br/>AI Prescription Analyzer</h1>
-    <p class="subtitle">Upload a prescription image · Gemini AI extracts medications · Get educational videos</p>
+    <p class="subtitle">Upload your prescription — Gemini AI reads it and finds educational videos for each medication</p>
   </div>
 
   <!-- Upload Card -->
-  <div class="upload-card" id="dropZone">
+  <div class="glass upload-card" id="dropZone">
     <div id="upload-default">
-      <div class="upload-icon">📷</div>
-      <div class="upload-title">Drop your prescription image here</div>
-      <div class="upload-sub">or click to browse · JPG, PNG, WEBP · up to 10 MB</div>
+      <div class="upload-icon-wrap">📷</div>
+      <div class="upload-title">Drop your prescription here</div>
+      <div class="upload-sub">JPG · PNG · WEBP · up to 10 MB</div>
       <div class="btn-row">
         <button class="btn btn-pick" onclick="document.getElementById('fileInput').click()">
           📂 Choose Image
         </button>
       </div>
     </div>
-
     <div id="preview-wrap">
       <img id="preview-img" src="" alt="Preview"/>
-      <div class="preview-name">
-        <span>📄</span><span id="file-name">prescription.jpg</span>
-      </div>
+      <div class="preview-name">📄 <span id="file-name"></span></div>
     </div>
-
     <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp"/>
   </div>
 
-  <!-- Action buttons (shown after image selected) -->
-  <div class="btn-row" id="action-row" style="margin-top:16px; display:none;">
-    <button class="btn btn-pick" onclick="document.getElementById('fileInput').click()">
-      🔄 Change Image
-    </button>
-    <button class="btn btn-analyze" id="analyzeBtn" onclick="analyze()">
-      🧬 Analyze Prescription
-    </button>
-    <button class="btn btn-clear" onclick="reset()">✕ Clear</button>
+  <!-- Action Buttons -->
+  <div class="btn-row" id="action-row">
+    <button class="btn btn-pick" onclick="document.getElementById('fileInput').click()">🔄 Change</button>
+    <button class="btn btn-analyze" id="analyzeBtn" onclick="analyze()">🧬 Analyze Prescription</button>
+    <button class="btn btn-clear" onclick="resetUI()">✕ Clear</button>
   </div>
 
   <!-- Loading -->
   <div id="loading">
-    <div class="spinner-wrap">
-      <div class="ring ring-1"></div>
-      <div class="ring ring-2"></div>
-    </div>
+    <div class="spinner"></div>
     <div class="loading-text">Analyzing with Gemini AI…</div>
-    <div class="loading-steps" id="loading-step">Computing image hash…</div>
+    <div class="loading-step" id="loading-step">Computing image hash…</div>
   </div>
 
   <!-- Result -->
@@ -314,207 +223,282 @@
 
 <div id="toast"></div>
 
+<!-- ═══════════════════════ THREE.JS BACKGROUND ═══════════════════════ -->
 <script>
-  const API = 'http://localhost:8080/api/v1/prescription';
-  let selectedFile = null;
-  let startTime = null;
+(function(){
+  const canvas = document.getElementById('bg');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
 
-  // ── File selection ──────────────────────────────────────────
-  document.getElementById('fileInput').addEventListener('change', e => {
-    if (e.target.files[0]) pickFile(e.target.files[0]);
-  });
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 80;
 
-  // Drag & drop
-  const drop = document.getElementById('dropZone');
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
-  drop.addEventListener('drop', e => {
-    e.preventDefault(); drop.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f && f.type.startsWith('image/')) pickFile(f);
-    else showToast('⚠️ Please drop an image file');
-  });
-  drop.addEventListener('click', e => {
-    if (e.target.closest('#action-row')) return;
-    document.getElementById('fileInput').click();
-  });
+  // Particles
+  const count = 180;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const colPalette = [
+    new THREE.Color('#7c3aed'),
+    new THREE.Color('#06b6d4'),
+    new THREE.Color('#10b981'),
+    new THREE.Color('#ec4899'),
+  ];
+  for(let i=0;i<count;i++){
+    positions[i*3]   = (Math.random()-0.5)*200;
+    positions[i*3+1] = (Math.random()-0.5)*200;
+    positions[i*3+2] = (Math.random()-0.5)*100;
+    const c = colPalette[Math.floor(Math.random()*colPalette.length)];
+    colors[i*3]=c.r; colors[i*3+1]=c.g; colors[i*3+2]=c.b;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  const mat = new THREE.PointsMaterial({size:1.2,vertexColors:true,transparent:true,opacity:.8});
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
 
-  function pickFile(file) {
-    selectedFile = file;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      document.getElementById('preview-img').src = ev.target.result;
-      document.getElementById('file-name').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
-      document.getElementById('upload-default').style.display = 'none';
-      document.getElementById('preview-wrap').style.display = 'block';
-      document.getElementById('action-row').style.display = 'flex';
-      document.getElementById('result').style.display = 'none';
-      drop.classList.add('has-image');
-    };
-    reader.readAsDataURL(file);
+  // Floating geometric shapes
+  const shapes = [];
+  const shapeGeos = [
+    new THREE.OctahedronGeometry(3,0),
+    new THREE.TetrahedronGeometry(2.5,0),
+    new THREE.IcosahedronGeometry(2,0),
+  ];
+  const shapeCols = ['#7c3aed','#06b6d4','#10b981','#ec4899','#f59e0b'];
+  for(let i=0;i<12;i++){
+    const g = shapeGeos[i % shapeGeos.length];
+    const m = new THREE.MeshBasicMaterial({
+      color: shapeCols[i%shapeCols.length],
+      wireframe:true,
+      transparent:true,
+      opacity: 0.12 + Math.random()*0.1
+    });
+    const mesh = new THREE.Mesh(g,m);
+    mesh.position.set(
+      (Math.random()-0.5)*180,
+      (Math.random()-0.5)*160,
+      (Math.random()-0.5)*60 - 20
+    );
+    mesh.userData.rx = (Math.random()-.5)*.006;
+    mesh.userData.ry = (Math.random()-.5)*.006;
+    scene.add(mesh);
+    shapes.push(mesh);
   }
 
-  // ── Analyze ─────────────────────────────────────────────────
-  async function analyze() {
-    if (!selectedFile) return;
+  let mouseX=0, mouseY=0;
+  document.addEventListener('mousemove',e=>{
+    mouseX = (e.clientX/window.innerWidth - 0.5)*0.4;
+    mouseY = (e.clientY/window.innerHeight - 0.5)*0.4;
+  });
 
-    startTime = Date.now();
-    setLoading(true);
+  window.addEventListener('resize',()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  (function animate(){
+    requestAnimationFrame(animate);
+    points.rotation.y += 0.0008;
+    points.rotation.x += 0.0003;
+    shapes.forEach(s=>{s.rotation.x+=s.userData.rx; s.rotation.y+=s.userData.ry;});
+    camera.position.x += (mouseX*8 - camera.position.x)*0.04;
+    camera.position.y += (-mouseY*8 - camera.position.y)*0.04;
+    camera.lookAt(scene.position);
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
+
+<!-- ═══════════════════════ APP LOGIC ═══════════════════════ -->
+<script>
+const API = 'http://localhost:8080/api/v1/prescription';
+let selectedFile = null;
+let startTime = null;
+
+// File input
+document.getElementById('fileInput').addEventListener('change', e => {
+  if(e.target.files[0]) pickFile(e.target.files[0]);
+});
+
+// Drag & drop
+const drop = document.getElementById('dropZone');
+drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('drag-over'); });
+drop.addEventListener('dragleave', ()=> drop.classList.remove('drag-over'));
+drop.addEventListener('drop', e=>{
+  e.preventDefault(); drop.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if(f && f.type.startsWith('image/')) pickFile(f);
+  else showToast('⚠️ Please drop an image file');
+});
+drop.addEventListener('click', e=>{
+  if(!e.target.closest('#action-row')) document.getElementById('fileInput').click();
+});
+
+function pickFile(file){
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('file-name').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+    document.getElementById('upload-default').style.display = 'none';
+    document.getElementById('preview-wrap').style.display = 'block';
+    document.getElementById('action-row').style.display = 'flex';
     document.getElementById('result').style.display = 'none';
-    document.getElementById('analyzeBtn').disabled = true;
+    drop.classList.add('has-file');
+  };
+  reader.readAsDataURL(file);
+}
 
-    // Animate loading steps
-    const steps = [
-      'Computing SHA-256 image hash…',
-      'Checking PostgreSQL cache…',
-      'Cache miss — calling Gemini 2.5 Flash…',
-      'Extracting medication names…',
-      'Matching videos to medications…'
-    ];
-    let si = 0;
-    const stepEl = document.getElementById('loading-step');
-    const stepInterval = setInterval(() => {
-      if (si < steps.length) stepEl.textContent = steps[si++];
-    }, 1200);
+async function analyze(){
+  if(!selectedFile) return;
+  startTime = Date.now();
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('analyzeBtn').disabled = true;
 
-    try {
-      const fd = new FormData();
-      fd.append('file', selectedFile);
+  const steps = [
+    'Computing SHA-256 image hash…',
+    'Checking PostgreSQL cache…',
+    'Cache miss — calling Gemini 2.5 Flash…',
+    'AI reading prescription image…',
+    'Extracting medication names…',
+    'Building YouTube video links…'
+  ];
+  let si = 0;
+  const stepEl = document.getElementById('loading-step');
+  const iv = setInterval(()=>{ if(si < steps.length) stepEl.textContent = steps[si++]; }, 1300);
 
-      const res = await fetch(`${API}/upload`, { method:'POST', body:fd });
-      const data = await res.json();
-      clearInterval(stepInterval);
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      setLoading(false);
-      renderResult(data, elapsed);
-    } catch(err) {
-      clearInterval(stepInterval);
-      setLoading(false);
-      renderError('Cannot connect to backend. Make sure Spring Boot is running on port 8080.', '🔌');
-    }
-    document.getElementById('analyzeBtn').disabled = false;
-  }
-
-  // ── Render result ────────────────────────────────────────────
-  function renderResult(data, elapsed) {
-    const el = document.getElementById('result');
-    el.style.display = 'block';
-
-    if (!data.success) {
-      el.innerHTML = `
-        <div class="error-card">
-          <div class="error-icon">⚠️</div>
-          <div>
-            <div class="error-title">Analysis Failed</div>
-            <div class="error-msg">${escHtml(data.message)}</div>
-          </div>
-        </div>`;
-      return;
-    }
-
-    const badge = data.cached
-      ? `<span class="cache-badge">⚡ Served from Cache</span>`
-      : `<span class="ai-badge">🧠 Analyzed by Gemini AI</span>`;
-
-    const meds = detectMeds(data.videos);
-    const medsHtml = meds.length
-      ? `<div class="meds-section">
-           <div class="section-label">Medications Detected</div>
-           <div class="meds-list">${meds.map(m=>`<span class="med-chip">💊 ${m}</span>`).join('')}</div>
-         </div>`
-      : '';
-
-    const videosHtml = (data.videos && data.videos.length)
-      ? data.videos.map((url, i) => {
-          const med = medFromUrl(url);
-          return `<div class="video-item">
-            <div class="video-num">${i+1}</div>
-            <div class="video-info">
-              <div class="video-title">${med} — Educational Video</div>
-              <a class="video-url" href="${url}" target="_blank" rel="noopener">${url}</a>
-            </div>
-            <div class="video-icon">▶️</div>
-          </div>`;
-        }).join('')
-      : '<div style="color:var(--muted);font-size:14px;">No specific videos found.</div>';
-
-    el.innerHTML = `
-      <div class="result-card">
-        <div class="result-header">
-          <div class="result-title">📹 Recommended Videos</div>
-          ${badge}
-        </div>
-        ${medsHtml}
-        <div class="section-label">Educational Resources</div>
-        <div class="video-list">${videosHtml}</div>
-        <div class="stats-bar">
-          <div class="stat"><span class="stat-val">${data.videos ? data.videos.length : 0}</span><span class="stat-lbl">Videos Found</span></div>
-          <div class="stat"><span class="stat-val">${elapsed}s</span><span class="stat-lbl">Response Time</span></div>
-          <div class="stat"><span class="stat-val">${data.cached ? 'DB' : 'AI'}</span><span class="stat-lbl">Source</span></div>
-          <div class="stat"><span class="stat-val">${data.cached ? '~1ms' : '~5s'}</span><span class="stat-lbl">AI Cost</span></div>
-        </div>
-      </div>`;
-
-    showToast(data.cached ? '⚡ Instant cache hit!' : '✅ Prescription analyzed!');
-    el.scrollIntoView({ behavior:'smooth', block:'start' });
-  }
-
-  function renderError(msg, icon='⚠️') {
-    const el = document.getElementById('result');
-    el.style.display = 'block';
-    el.innerHTML = `
-      <div class="error-card">
-        <div class="error-icon">${icon}</div>
-        <div>
-          <div class="error-title">Error</div>
-          <div class="error-msg">${escHtml(msg)}</div>
-        </div>
-      </div>`;
-  }
-
-  // ── Helpers ──────────────────────────────────────────────────
-  function setLoading(on) {
-    document.getElementById('loading').style.display = on ? 'block' : 'none';
-  }
-
-  function reset() {
-    selectedFile = null;
-    document.getElementById('fileInput').value = '';
-    document.getElementById('upload-default').style.display = 'block';
-    document.getElementById('preview-wrap').style.display = 'none';
-    document.getElementById('action-row').style.display = 'none';
-    document.getElementById('result').style.display = 'none';
+  try {
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    const res = await fetch(`${API}/upload`, {method:'POST', body:fd});
+    const data = await res.json();
+    clearInterval(iv);
+    const elapsed = ((Date.now()-startTime)/1000).toFixed(1);
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('dropZone').classList.remove('has-image');
+    renderResult(data, elapsed);
+  } catch(err) {
+    clearInterval(iv);
+    document.getElementById('loading').style.display = 'none';
+    renderError('Cannot connect to backend. Make sure Spring Boot is running on port 8080.');
+  }
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+function renderResult(data, elapsed){
+  const el = document.getElementById('result');
+  el.style.display = 'block';
+
+  if(!data.success){
+    el.innerHTML = `
+      <div class="glass result-banner error">
+        <div class="banner-left">
+          <div class="banner-icon">⚠️</div>
+          <div><div class="banner-title" style="color:#f87171">Analysis Failed</div>
+          <div class="banner-sub">${esc(data.message)}</div></div>
+        </div>
+      </div>`;
+    return;
   }
 
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-  }
+  const tag = data.cached
+    ? `<div class="cache-tag">⚡ Served from Cache</div>`
+    : `<div class="ai-tag">🤖 Analyzed by Gemini AI</div>`;
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+  const medsHtml = (data.medications && data.medications.length)
+    ? `<div class="section-label">💊 Medications Detected</div>
+       <div class="meds-grid">
+         ${data.medications.map(m=>{
+           const name = typeof m === 'string' ? m : m.name;
+           const use  = typeof m === 'string' ? '' : (m.use || '');
+           return `<div class="med-chip">
+             <div class="med-chip-name">💊 ${esc(name)}</div>
+             ${use ? `<div class="med-chip-use">${esc(use)}</div>` : ''}
+           </div>`;
+         }).join('')}
+       </div>` : '';
 
-  // Extract medication name from video URL
-  function medFromUrl(url) {
-    const match = url.match(/watch\?v=(\w+)_education/);
-    if (!match) return 'Medication';
-    return match[1].charAt(0).toUpperCase() + match[1].slice(1);
-  }
+  const videosHtml = (data.videos && data.videos.length)
+    ? data.videos.map((url,i)=>{
+        const mObj = data.medications && data.medications[i] ? data.medications[i] : null;
+        const medName = mObj ? (typeof mObj === 'string' ? mObj : mObj.name) : 'Medication';
+        return `<a class="video-card" href="${url}" target="_blank" rel="noopener">
+          <div class="video-num">${i+1}</div>
+          <div class="video-info">
+            <div class="video-med">${esc(medName)} — Educational Guide</div>
+            <div class="video-link">${url}</div>
+          </div>
+          <div class="video-play">▶️</div>
+        </a>`;
+      }).join('')
+    : `<div style="color:var(--muted);font-size:14px;padding:16px">No videos found.</div>`;
 
-  function detectMeds(videos) {
-    if (!videos) return [];
-    return videos.map(medFromUrl).filter(m => m !== 'Medication' && m !== 'general');
-  }
+  el.innerHTML = `
+    <div class="glass result-banner success">
+      <div class="banner-left">
+        <div class="banner-icon">${data.cached ? '⚡' : '🧬'}</div>
+        <div>
+          <div class="banner-title">${data.cached ? 'Instant Cache Hit!' : 'Prescription Analyzed!'}</div>
+          <div class="banner-sub">${esc(data.message)}</div>
+        </div>
+      </div>
+      ${tag}
+    </div>
+    <div class="glass" style="padding:28px 24px">
+      ${medsHtml}
+      <div class="section-label">🎬 Educational Videos</div>
+      <div class="videos-grid">${videosHtml}</div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-val">${data.medications ? data.medications.length : 0}</div><div class="stat-lbl">Medications</div></div>
+        <div class="stat"><div class="stat-val">${data.videos ? data.videos.length : 0}</div><div class="stat-lbl">Videos</div></div>
+        <div class="stat"><div class="stat-val">${elapsed}s</div><div class="stat-lbl">Response Time</div></div>
+        <div class="stat"><div class="stat-val">${data.cached ? 'DB' : 'AI'}</div><div class="stat-lbl">Source</div></div>
+      </div>
+    </div>`;
 
-  // Check backend on load
-  fetch(`${API}/health`)
-    .then(r => r.text())
-    .then(() => showToast('✅ Backend connected successfully'))
-    .catch(() => showToast('⚠️ Backend offline — start Spring Boot first'));
+  showToast(data.cached ? '⚡ Instant cache hit!' : '✅ Prescription analyzed successfully!');
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderError(msg){
+  const el = document.getElementById('result');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="glass result-banner error">
+      <div class="banner-left">
+        <div class="banner-icon">🔌</div>
+        <div><div class="banner-title" style="color:#f87171">Connection Error</div>
+        <div class="banner-sub">${esc(msg)}</div></div>
+      </div>
+    </div>`;
+}
+
+function resetUI(){
+  selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('upload-default').style.display = 'block';
+  document.getElementById('preview-wrap').style.display = 'none';
+  document.getElementById('action-row').style.display = 'none';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('dropZone').classList.remove('has-file','drag-over');
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Backend health check on load
+fetch(`${API}/health`)
+  .then(()=> showToast('✅ Backend connected'))
+  .catch(()=> showToast('⚠️ Backend offline — start Spring Boot first'));
 </script>
 </body>
 </html>
